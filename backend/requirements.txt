@@ -1,0 +1,7 @@
+fastapi==0.109.0           # Web framework
+uvicorn[standard]==0.27.1  # ASGI server
+google-genai==0.3.0        # Gemini API
+yfinance==0.2.36           # Stock data
+requests==2.31.0           # HTTP requests
+python-multipart==0.0.9    # File uploads
+pydantic==2.5.3            # Data validation
