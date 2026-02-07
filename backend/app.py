@@ -51,6 +51,8 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:8080",
     "http://localhost:3000",
+    "https://marketmindainexus.lovable.app",  # Your frontend domain
+
 ]
 
 app.add_middleware(
@@ -213,7 +215,7 @@ async def analyze_stock(ticker: str, chart_image: UploadFile = File(None)):
     
     try:
         triage_response = client.models.generate_content(
-            model="gemini-3-flash",  # FAST model for triage
+            model="gemini-3-flash-preview",  # FAST model for triage
             contents=triage_prompt
         )
         
@@ -265,24 +267,17 @@ async def analyze_stock(ticker: str, chart_image: UploadFile = File(None)):
     
     # Add chart image if provided (multimodal capability)
     prompt_parts = [analysis_prompt]
-    if chart_image:
-        print("📸 [PRO] Processing chart image (multimodal analysis)...")
-        image_bytes = await chart_image.read()
-        prompt_parts.append(types.Part.from_bytes(image_bytes, "image/png"))
-    
+  
     # Generate with Thought Signatures enabled
-    try:
-        analysis_response = client.models.generate_content(
-            model="gemini-3-pro-preview",  # DEEP model with reasoning
-            contents=prompt_parts,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                thought_signatures=True,  # 🔑 KEY FEATURE: Enable reasoning audit trail
-                temperature=0.3,  # Lower temperature for more deterministic trading advice
-            )
+    analysis_response = client.models.generate_content(
+        model="gemini-3-pro-preview",  # DEEP model with reasoning
+        contents=prompt_parts,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.3,  # Lower temperature for more deterministic trading advice
         )
-    except Exception as e:
-        raise HTTPException(500, f"Gemini Pro analysis failed: {e}")
+    )
+
     
     # ==========================================
     # STEP 4: EXTRACT THOUGHT SIGNATURES
@@ -318,18 +313,12 @@ async def analyze_stock(ticker: str, chart_image: UploadFile = File(None)):
     for candidate in analysis_response.candidates:
         for part in candidate.content.parts:
             if part.text:
-                try:
-                    # Clean potential markdown formatting
-                    clean_text = part.text.replace("```json", "").replace("```", "").strip()
-                    json_data = json.loads(clean_text)
-                    print(f"✅ [PARSE] Successfully parsed analysis response")
-                    break
-                except json.JSONDecodeError as e:
-                    print(f"⚠️ JSON parse error: {e}")
-                    continue
-    
-    if not json_data:
-        raise HTTPException(500, "Failed to parse AI response")
+                # Clean potential markdown formatting
+                clean_text = part.text.replace("```json", "").replace("```", "").strip()
+                json_data = json.loads(clean_text)
+                print(f"✅ [PARSE] Successfully parsed analysis response")
+                break
+              
     
     # ==========================================
     # STEP 6: VALIDATE & BUILD RESPONSE
@@ -396,26 +385,31 @@ async def get_news_trading_candidates(budget: float):
                 response_mime_type="application/json"
             )
         )
-        
+        print(response.candidates)
         if response.candidates:
             candidate = response.candidates[0]
+            print(candidate.content.parts)
+
             for part in candidate.content.parts:
                 if part.text:
+                    print(part.text)
                     try:
                         clean_text = part.text.replace("```json", "").replace("```", "").strip()
                         data = json.loads(clean_text)
                         if isinstance(data, list):
                             candidates_data = data
-                    except:
+                    except Exception as e:
+                        print(f"error 1 {e}")
                         continue
     except Exception as e:
         print(f"AI Search Error: {e}")
         return []
 
     final_output = []
+    print(candidates_data)
     if not candidates_data:
         return []
-
+    
     for item in candidates_data:
         ticker = item.get('ticker')
         try:
@@ -429,7 +423,8 @@ async def get_news_trading_candidates(budget: float):
                     news_catalyst=item.get("news_headline", "News Catalyst"),
                     sentiment=item.get("sentiment", "Neutral")
                 ))
-        except Exception:
+        except Exception as e:
+            print(f"error 2 {e}")
             continue
 
     return final_output[:10]
@@ -826,9 +821,6 @@ OUTPUT STRICT JSON:
             contents=verification_prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                thinking_config=types.ThinkingConfig(
-                    include_thoughts=True
-                ),
                 temperature=0.2,  # Lower temp for more deterministic verification
                 tools=[
                     types.Tool(
