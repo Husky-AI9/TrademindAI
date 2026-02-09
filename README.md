@@ -33,7 +33,7 @@ AI-powered stock analytics platform for informed investment decisions.
    npm run dev
    ```
 
-4. Access the application at `http://localhost:3000`
+4. Access the application at `http://localhost:8000`
 
 ## Disclaimer
 
